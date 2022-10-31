@@ -1,10 +1,6 @@
-import socket
+from dnslib import DNSRecord, DNSHeader, DNSQuestion, QTYPE, RR, A
 
-HOST = "127.0.0.1"
-PORT = 65432
-
-with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-    s.connect((HOST, PORT))
-    s.sendall(b"Hello, world")
-    data = s.recv(1024)
-    print(f"Received {data!r}")
+d = DNSRecord(DNSHeader(qr=1, aa=1, ra=1),
+              q=DNSQuestion("abc.com"),
+              a=RR("abc.com", rdata=A("1.2.3.4")))
+a = d
