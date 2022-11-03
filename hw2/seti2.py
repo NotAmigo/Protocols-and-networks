@@ -1,69 +1,48 @@
 import json
 import socket
-import sys
 import threading
 from dnslib import DNSRecord, DNSHeader, DNSQuestion, RR, A
 from functools import wraps
 from datetime import datetime
 from playsound import playsound
 
-
 IP = '0.0.0.0'
-PORT = 53
 ROOT = '192.203.230.10'
-DNSPORT = 53
+PORT = 53
 
 
-class Sniffer:
-    def __init__(self, sock: socket.socket):
-        self.answer = []
-        self.socket = sock
-        self.ttl = 0
-
-    def recursive_dns_sniffer(self, info: bytes, address: tuple[str, int]) -> None:
-        self.socket.sendto(info, address)
+def recursive_sniffer(s: socket.socket, info: bytes, address: tuple[str, int]) -> tuple[bytes, int]:
+    stack = [address]
+    is_timed_out = False
+    while stack:
+        s.sendto(info, stack.pop())
         try:
-            data, addr = self.socket.recvfrom(1024)
-            while data <= info:
-                data, addr = self.socket.recvfrom(1024)
-        except ConnectionResetError:
-            sys.exit(1)
+            data, addr = s.recvfrom(4096)
+        except socket.timeout:
+            is_timed_out = True
+            break
         dns = DNSRecord.parse(data)
-        if dns.header.a != 0 or dns.header.rcode != 0:
-            self.ttl = dns.a.ttl
-            self.answer.append(data)
-            return
-        for answer in dns.ar:
-            if answer.rtype == 1:
-                b = str(answer.rdata)
-                self.recursive_dns_sniffer(info, (b, DNSPORT))
-            else:
-                continue
-        if not self.answer:
-            for test in dns.auth:
-                ip = str(test.rdata.label)
-                req = DNSRecord.question(ip).pack()
-                sniffer = Sniffer(self.socket)
-                sniffer.recursive_dns_sniffer(req, (ROOT, DNSPORT))
-                test2 = list(set(sniffer()[0]))
-                if not test2:
-                    continue
-                for t in test2:
-                    curr_dns = DNSRecord.parse(t)
-                    curr_ip = str(curr_dns.a.rdata)
-                    self.recursive_dns_sniffer(info, (curr_ip, DNSPORT))
-
-    def __call__(self):
-        return sorted(list(set(self.answer))), self.ttl
+        if dns.header.a or dns.header.rcode:
+            return data, dns.a.ttl
+        filtered_ar = list(filter(lambda x: x.rtype == 1, dns.ar))
+        if filtered_ar:
+            for add in filtered_ar:
+                stack.append((str(add.rdata), PORT))
+        elif dns.auth:
+            res = recursive_sniffer(s, DNSRecord.question(dns.auth[0].rdata.label).pack(), (ROOT, PORT))
+            respack = dns.parse(res[0])
+            stack.append((str(respack.a.rdata), PORT))
+    no_dns = DNSRecord.parse(info)
+    no_dns.header.rcode = 2 if is_timed_out else 1
+    return no_dns.pack(), 0
 
 
 def dns_ttl_cache(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         cache_key = args[1]
-        if cache_key not in wrapper.cache:
-            wrapper.cache[cache_key] = func(*args, **kwargs)
-        if wrapper.cache[cache_key][1] < int(datetime.now().timestamp()) - wrapper.cache[cache_key][2]:
+        if cache_key not in wrapper.cache \
+                or wrapper.cache[cache_key][1] < int(datetime.now().timestamp()) - wrapper.cache[cache_key][2]:
             wrapper.cache[cache_key] = func(*args, **kwargs)
         with open('cache.json', 'w', encoding='utf-8') as f1:
             json.dump(wrapper.cache, f1, ensure_ascii=False, indent=4, default=str)
@@ -74,52 +53,52 @@ def dns_ttl_cache(func):
 
 
 @dns_ttl_cache
-def get_result(s: socket.socket, req: str) -> tuple[list[bytes], int, int]:
+def get_result(s: socket.socket, req: str) -> tuple[str, int, int]:
     dnsdatatest = DNSRecord.question(req)
     if 'multiply' in req:
         return multiply_ip_handler(dnsdatatest)
-    address = (ROOT, DNSPORT)
-    sniffer = Sniffer(s)
-    sniffer.recursive_dns_sniffer(dnsdatatest.pack(), address)
-    ans = sniffer()
-    return [a.decode('cp437') for a in ans[0]], ans[1], int(datetime.now().timestamp())
+    address = (ROOT, PORT)
+    ans = recursive_sniffer(s, dnsdatatest.pack(), address)
+    return ans[0].decode('cp437'), ans[1], int(datetime.now().timestamp())
 
 
 def play():
     threading.Thread(target=playsound, args=('hello.mp3', True,), daemon=True).start()
 
 
-def multiply_ip_handler(dns: DNSRecord) -> tuple[list[bytes], int, int]:
+def multiply_ip_handler(dns: DNSRecord) -> tuple[str, int, int]:
     mul = 1
     querry_name = str(dns.q.qname)
     for part in querry_name.split('.'):
         if part.isdigit():
             mul *= int(part)
-            mul %= 256
         if part == 'multiply':
             break
-    answer = f'127.0.0.{mul}'
+    answer = f'127.0.0.{mul % 256}'
     response = DNSRecord(DNSHeader(qr=1, aa=1, ra=1),
                          q=DNSQuestion(querry_name),
                          a=RR(querry_name, rdata=A(answer)))
     response.header.id = dns.header.id
-    ttl = response.a.ttl = 1488
-    return [response.pack().decode('cp437')], ttl, int(datetime.now().timestamp())
+    ttl = response.a.ttl = 100000
+    return response.pack().decode('cp437'), ttl, int(datetime.now().timestamp())
 
 
 def main():
     play()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind((IP, PORT))
+        s.settimeout(1)
         while True:
-            datadig, addrdig = s.recvfrom(1024)
+            try:
+                datadig, addrdig = s.recvfrom(1024)
+            except socket.timeout:
+                continue
             parse = DNSRecord.parse(datadig)
             dnsreq, id = str(parse.q.qname), parse.header.id
-            response = [c.encode('cp437') for c in get_result(s, dnsreq)[0]]
-            for ans in response:
-                dnsans = DNSRecord.parse(ans)
-                dnsans.header.id = id
-                s.sendto(dnsans.pack(), addrdig)
+            response = get_result(s, dnsreq)[0].encode('cp437')
+            dnsans = DNSRecord.parse(response)
+            dnsans.header.id = id
+            s.sendto(dnsans.pack(), addrdig)
 
 
 main()
