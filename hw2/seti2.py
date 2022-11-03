@@ -8,7 +8,8 @@ from playsound import playsound
 
 IP = '0.0.0.0'
 ROOT = '192.203.230.10'
-PORT = 53
+DESTPORT = 53
+PORT = 5533
 
 
 def recursive_sniffer(s: socket.socket, info: bytes, address: tuple[str, int]) -> tuple[bytes, int]:
@@ -27,11 +28,11 @@ def recursive_sniffer(s: socket.socket, info: bytes, address: tuple[str, int]) -
         filtered_ar = list(filter(lambda x: x.rtype == 1, dns.ar))
         if filtered_ar:
             for add in filtered_ar:
-                stack.append((str(add.rdata), PORT))
+                stack.append((str(add.rdata), DESTPORT))
         elif dns.auth:
-            res = recursive_sniffer(s, DNSRecord.question(dns.auth[0].rdata.label).pack(), (ROOT, PORT))
+            res = recursive_sniffer(s, DNSRecord.question(dns.auth[0].rdata.label).pack(), (ROOT, DESTPORT))
             respack = dns.parse(res[0])
-            stack.append((str(respack.a.rdata), PORT))
+            stack.append((str(respack.a.rdata), DESTPORT))
     no_dns = DNSRecord.parse(info)
     no_dns.header.rcode = 2 if is_timed_out else 1
     return no_dns.pack(), 0
@@ -57,7 +58,7 @@ def get_result(s: socket.socket, req: str) -> tuple[str, int, int]:
     dnsdatatest = DNSRecord.question(req)
     if 'multiply' in req:
         return multiply_ip_handler(dnsdatatest)
-    address = (ROOT, PORT)
+    address = (ROOT, DESTPORT)
     ans = recursive_sniffer(s, dnsdatatest.pack(), address)
     return ans[0].decode('cp437'), ans[1], int(datetime.now().timestamp())
 
