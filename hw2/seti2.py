@@ -30,9 +30,12 @@ def recursive_sniffer(s: socket.socket, info: bytes, address: tuple[str, int]) -
             for add in filtered_ar:
                 stack.append((str(add.rdata), DESTPORT))
         elif dns.auth:
-            res = recursive_sniffer(s, DNSRecord.question(dns.auth[0].rdata.label).pack(), (ROOT, DESTPORT))
+            name = str(dns.auth[0].rdata)
+            res = recursive_sniffer(s, DNSRecord.question(name).pack(), (ROOT, DESTPORT))
             respack = dns.parse(res[0])
-            stack.append((str(respack.a.rdata), DESTPORT))
+            if respack.header.a == 0:
+                return data, 0
+            stack.append((str(respack.rr[0].rdata), DESTPORT))
     no_dns = DNSRecord.parse(info)
     no_dns.header.rcode = 2 if is_timed_out else 1
     return no_dns.pack(), 0
