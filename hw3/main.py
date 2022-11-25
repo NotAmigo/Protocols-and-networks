@@ -1,31 +1,54 @@
 from scapy.all import *
 import socket
 
-dst = "192.168.1.1"
+dst = "8.8.8.8"
 
 
-def to_millisecondss(timestamp):
+def to_milliseconds(timestamp):
     return int(timestamp * 1000)
 
 
-def TCP_port_scanner(dst, ports):
-    ans, unans = sr(IP(dst=dst) / TCP(sport=1488, dport=ports), verbose=0)
-    for response in ans:
-        port = response[1][TCP].dport
-        a = 5
-    # for i in ports:
-    #     ans, unans = sr(IP(dst=dst) / TCP(sport=65, dport=i), timeout=1, verbose=0)
-    #     try:
-    #         serv = socket.getservbyport(i)
-    #     except:
-    #         serv = "-"
-    #     timestamp = to_millisecondss(ans[0][1].time - ans[0][0].sent_time)
-    #     print(f"TCP {i} {timestamp} {serv}")
+def try_getservbyport(port):
+    try:
+        return socket.getservbyport(port)
+    except:
+        return "-"
 
 
-def UDP_port_scanner(dst, ports):
-    ans, unans = sr(IP(dst=dst) / UDP(sport=65, dport=ports), timeout=1, verbose=0)
-    print(ans.summary())
+def try_get_type_packet(request, packet):
+    if packet is TCP:
+        return request[packet]
+    elif packet is UDP:
+        try:
+            return request[UDP]
+        except:
+            return None
+    else:
+        raise Exception("Unknown packet type")
 
 
-TCP_port_scanner(dst, (440, 445))
+def get_flags(packet):
+    try:
+        return packet.flags
+    except:
+        return None
+
+
+def TCP_port_scanner(dst, ports, packet):
+    ans, unans = sr(IP(dst=dst) / packet(sport=1488, dport=ports),
+                    verbose=0)
+    for answer in ans:
+        request, response = answer
+        proto_request = request[packet]
+        proto_response = try_get_type_packet(request, packet)
+        flags = get_flags(proto_response)
+        if proto_response and flags and flags == 18: # TODO: rewrite on getlayer[TCP] and haslayer[TCP] f.e
+            port = proto_request.dport
+            protocol = proto_request.name
+            application_protocol = try_getservbyport(port)
+            timestamp = to_milliseconds(response.time - request.sent_time)
+            print(f"{protocol} {port} {timestamp}ms {application_protocol}")
+
+
+
+TCP_port_scanner(dst, (53, 60), TCP)
