@@ -1,5 +1,6 @@
 from scapy.all import *
 import socket
+import click
 
 dst = "8.8.8.8"
 
@@ -34,13 +35,12 @@ def get_flags(packet):
         return None
 
 
-def TCP_port_scanner(dst, ports, packet):
-    ans, unans = sr(IP(dst=dst) / packet(sport=1488, dport=ports),
-                    verbose=0)
+def port_scanner(dst, ports, packet):
+    ans, unans = sr(IP(dst=dst) / packet(sport=1488, dport=ports), timeout=2, verbose=0)
     for answer in ans:
         request, response = answer
         proto_request = request[packet]
-        proto_response = try_get_type_packet(request, packet)
+        proto_response = try_get_type_packet(response, packet)
         flags = get_flags(proto_response)
         if proto_response and flags and flags == 18: # TODO: rewrite on getlayer[TCP] and haslayer[TCP] f.e
             port = proto_request.dport
@@ -50,5 +50,17 @@ def TCP_port_scanner(dst, ports, packet):
             print(f"{protocol} {port} {timestamp}ms {application_protocol}")
 
 
+def get_args(ports):
+    for port in ports:
+        print(port)
 
-TCP_port_scanner(dst, (53, 60), TCP)
+
+@click.command()
+@click.option('-v', '--verbose', is_flag=True, help='Verbose mode')
+@click.option('--timeout', default=2, help='Timeout')
+@click.option('-g', '--guess', is_flag=True, help='Guess mode')
+@click.option('-j', '--num-threads', default=1, help='Number of threads')
+@click.argument('dst', nargs=1)
+@click.argument('ports', nargs=-1)
+def portscan(verbose, timeout, guess, num_threads, ports, dst):
+    click.echo(dst)
