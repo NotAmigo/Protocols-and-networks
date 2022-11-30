@@ -4,17 +4,13 @@ from tcp_packet import TCPPacket
 from udp_packet import UDPPacket
 from tracert import Traceroute
 
-hostname = "8.8.8.8"
-NETWORK_ROUTER_ADMIN_LOGIN = '192.168.1.120'
-
 
 @click.command()
-@click.argument('destination', nargs=1)
+@click.argument('destination', nargs=1, default='8.8.8.8')
 @click.argument('type', nargs=1)
-@click.option('--source', default=NETWORK_ROUTER_ADMIN_LOGIN,
-              help='Source IP address')
 @click.option('--id', default=0, help='Custom id')
-@click.option('--seq', default=0, help='Custom SEQ')
+@click.option('--seq', default=0,
+              help='Custom SEQ only for ICMP and UDP and TCP')
 @click.option('--len', default=40, help='Length of the ICMP packet. '
                                         'If you type custom, payload, length '
                                         'will be ignored, length ignored for '
@@ -24,16 +20,16 @@ NETWORK_ROUTER_ADMIN_LOGIN = '192.168.1.120'
 @click.option('--max_ttl', default=30, help='Max TTL')
 @click.option('--repeat', '-n', default=3, help='Requests per TTL')
 @click.option('--timeout', '-t', default=3, help='Timeout for each request')
-@click.option('--verbose', '-v', is_flag=True, help='Номер автономной системы')
+@click.option('--verbose', '-v', is_flag=True, help='Autonomous system number')
 @click.option('--interval', default=0, help='Interval between requests')
 @click.option('--debug', is_flag=True, help='Debug mode')
-def main(destination, type, source, id, seq, len, payload, port, max_ttl, repeat, timeout, verbose, interval, debug):
+def main(destination, type, id, seq, len, payload, port, max_ttl, repeat, timeout, verbose, interval, debug):
     if type == 'icmp':
-        packet = ICMPPacket(destination, id, seq, source, len, payload)
+        packet = ICMPPacket(destination, id, seq, len, payload)
     elif type == 'tcp':
-        packet = TCPPacket(destination, id, seq, source, port)
+        packet = TCPPacket(destination, id, seq, port)
     elif type == 'udp':
-        packet = UDPPacket(destination, id, seq, source, port)
+        packet = UDPPacket(destination, id, seq, port)
     else:
         print('Wrong type')
         return
