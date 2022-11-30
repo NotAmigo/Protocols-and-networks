@@ -63,4 +63,4 @@ def get_args(ports):
 @click.argument('dst', nargs=1)
 @click.argument('ports', nargs=-1)
 def portscan(verbose, timeout, guess, num_threads, ports, dst):
-    click.echo(dst)
+    print(dst)
