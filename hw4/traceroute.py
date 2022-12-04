@@ -1,8 +1,28 @@
 import click
+from scapy.all import IPv6, IP
+from socket import inet_aton, error, inet_pton, AF_INET6
 from icmp_packet import ICMPPacket
 from tcp_packet import TCPPacket
 from udp_packet import UDPPacket
 from tracert import Traceroute
+from IPv4Packet import IPv4Packet
+from IPv6Packet import IPv6Packet
+
+
+def check_IPv6_validation(ip):
+    try:
+        inet_pton(AF_INET6, ip)
+        return True
+    except error:
+        raise click.BadParameter('Invalid IPv6 address')
+
+
+def check_IPv4_validation(ip):
+    try:
+        inet_aton(ip)
+        return True
+    except error:
+        return False
 
 
 @click.command()
@@ -24,12 +44,17 @@ from tracert import Traceroute
 @click.option('--interval', default=0, help='Interval between requests')
 @click.option('--debug', is_flag=True, help='Debug mode')
 def main(destination, type, id, seq, len, payload, port, max_ttl, repeat, timeout, verbose, interval, debug):
+    packet = None
+    if check_IPv4_validation(destination):
+        packet = IP
+    elif check_IPv6_validation(destination):
+        packet = IPv6
     if type == 'icmp':
-        packet = ICMPPacket(destination, id, seq, len, payload)
+        packet = ICMPPacket(packet, destination, id, seq, len, payload)
     elif type == 'tcp':
-        packet = TCPPacket(destination, id, seq, port)
+        packet = TCPPacket(packet, destination, id, seq, port)
     elif type == 'udp':
-        packet = UDPPacket(destination, id, seq, port)
+        packet = UDPPacket(packet, destination, id, seq, port)
     else:
         print('Wrong type')
         return
