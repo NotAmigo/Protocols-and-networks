@@ -52,6 +52,9 @@ class PortScan:
         for answer in ans:
             request, response = answer
             if response.haslayer(packet_type):
+                if response.haslayer(TCP):
+                    if response[TCP].flags != 18:
+                        continue
                 port = request[packet_type].dport
                 protocol = request[packet_type].name
                 application_protocol = self.try_getservbyport(port)
