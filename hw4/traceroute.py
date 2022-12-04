@@ -5,8 +5,6 @@ from icmp_packet import ICMPPacket
 from tcp_packet import TCPPacket
 from udp_packet import UDPPacket
 from tracert import Traceroute
-from IPv4Packet import IPv4Packet
-from IPv6Packet import IPv6Packet
 
 
 def check_IPv6_validation(ip):
@@ -44,17 +42,17 @@ def check_IPv4_validation(ip):
 @click.option('--interval', default=0, help='Interval between requests')
 @click.option('--debug', is_flag=True, help='Debug mode')
 def main(destination, type, id, seq, len, payload, port, max_ttl, repeat, timeout, verbose, interval, debug):
-    packet = None
+    inner_packet = None
     if check_IPv4_validation(destination):
-        packet = IP
+        inner_packet = IP
     elif check_IPv6_validation(destination):
-        packet = IPv6
+        inner_packet = IPv6
     if type == 'icmp':
-        packet = ICMPPacket(packet, destination, id, seq, len, payload)
+        packet = ICMPPacket(inner_packet, destination, id, seq, len, payload)
     elif type == 'tcp':
-        packet = TCPPacket(packet, destination, id, seq, port)
+        packet = TCPPacket(inner_packet, destination, id, seq, port)
     elif type == 'udp':
-        packet = UDPPacket(packet, destination, id, seq, port)
+        packet = UDPPacket(inner_packet, destination, id, seq, port)
     else:
         print('Wrong type')
         return

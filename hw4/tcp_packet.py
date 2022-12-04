@@ -1,6 +1,5 @@
 from packet import Packet
-from scapy.all import IP, TCP, RandShort
-from type_dict import TypeDict
+from scapy.all import IP, TCP, IPv6, RandShort
 
 
 class TCPPacket(Packet):
@@ -9,9 +8,14 @@ class TCPPacket(Packet):
         self.port = port
 
     def get_packet(self, ttl) -> TCP:
-        type_dict = TypeDict(self.dst, ttl, self.id)
+        if self.packet == IP:
+            inner_packet = IP(dst=self.dst, ttl=ttl, id=self.id)
+        elif self.packet == IPv6:
+            inner_packet = IPv6(dst=self.dst, hlim=ttl)
+        else:
+            raise ValueError("Unknown packet type")
         return (
-                type_dict(self.packet)
+                inner_packet
                 / TCP(flags=0x2, dport=self.port, sport=RandShort(),
                       seq=self.seq)
         )

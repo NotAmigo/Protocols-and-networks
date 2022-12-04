@@ -1,5 +1,4 @@
 from scapy.all import RandString, IP, ICMP, IPv6
-from type_dict import TypeDict
 
 from packet import Packet
 
@@ -18,9 +17,14 @@ class ICMPPacket(Packet):
         self.length = length
 
     def get_packet(self, ttl: int) -> ICMP:
-        type_dict = TypeDict(self.dst, ttl, self.id)
+        if self.packet == IP:
+            inner_packet = IP(dst=self.dst, ttl=ttl, id=self.id)
+        elif self.packet == IPv6:
+            inner_packet = IPv6(dst=self.dst, hlim=ttl)
+        else:
+            raise ValueError("Unknown packet type")
         return (
-                type_dict(self.packet)
+                inner_packet
                 / ICMP(id=self.id, seq=self.seq)
                 / self.payload
                 )
