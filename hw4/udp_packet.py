@@ -1,4 +1,5 @@
 from packet import Packet
+from IPPacket import get_packet_by_version
 from scapy.all import IP, IPv6, UDP, RandShort
 
 
@@ -8,13 +9,5 @@ class UDPPacket(Packet):
         self.port = port
 
     def get_packet(self, ttl) -> UDP:
-        if self.packet == IP:
-            inner_packet = IP(dst=self.dst, ttl=ttl, id=self.id)
-        elif self.packet == IPv6:
-            inner_packet = IPv6(dst=self.dst, hlim=ttl)
-        else:
-            raise ValueError("Unknown packet type")
-        return (
-                inner_packet
-                / UDP(dport=self.port, sport=RandShort())
-        )
+        return (get_packet_by_version(self.packet, self.dst, ttl, self.id)
+                / UDP(dport=self.port, sport=RandShort()))

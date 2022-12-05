@@ -1,10 +1,11 @@
 import click
-from scapy.all import IPv6, IP
 from socket import inet_aton, error, inet_pton, AF_INET6
 from icmp_packet import ICMPPacket
 from tcp_packet import TCPPacket
 from udp_packet import UDPPacket
 from tracert import Traceroute
+from logging import getLogger, ERROR
+getLogger("scapy.runtime").setLevel(ERROR)
 
 
 def check_IPv6_validation(ip):
@@ -42,19 +43,19 @@ def check_IPv4_validation(ip):
 @click.option('--interval', default=0, help='Interval between requests')
 @click.option('--debug', is_flag=True, help='Debug mode')
 def main(destination, type, id, seq, len, payload, port, max_ttl, repeat, timeout, verbose, interval, debug):
-    inner_packet = None
+    packet_version = 0
     if check_IPv4_validation(destination):
-        inner_packet = IP
+        packet_version = 4
     elif check_IPv6_validation(destination):
-        inner_packet = IPv6
+        packet_version = 6
     if type == 'icmp':
-        packet = ICMPPacket(inner_packet, destination, id, seq, len, payload)
+        packet = ICMPPacket(packet_version, destination, id, seq, len, payload)
     elif type == 'tcp':
-        packet = TCPPacket(inner_packet, destination, id, seq, port)
+        packet = TCPPacket(packet_version, destination, id, seq, port)
     elif type == 'udp':
-        packet = UDPPacket(inner_packet, destination, id, seq, port)
+        packet = UDPPacket(packet_version, destination, id, seq, port)
     else:
-        print('Wrong type')
+        click.echo(click.style('Invalid type', fg='red'))
         return
     traceroute = Traceroute(destination, packet, max_ttl,
                             repeat, timeout, interval, debug, verbose)

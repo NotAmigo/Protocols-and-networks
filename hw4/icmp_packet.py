@@ -1,4 +1,5 @@
 from scapy.all import RandString, IP, ICMP, IPv6
+from IPPacket import get_packet_by_version
 
 from packet import Packet
 
@@ -17,14 +18,8 @@ class ICMPPacket(Packet):
         self.length = length
 
     def get_packet(self, ttl: int) -> ICMP:
-        if self.packet == IP:
-            inner_packet = IP(dst=self.dst, ttl=ttl, id=self.id)
-        elif self.packet == IPv6:
-            inner_packet = IPv6(dst=self.dst, hlim=ttl)
-        else:
-            raise ValueError("Unknown packet type")
         return (
-                inner_packet
+                get_packet_by_version(self.packet, self.dst, ttl, self.id)
                 / ICMP(id=self.id, seq=self.seq)
                 / self.payload
                 )
